@@ -3,110 +3,167 @@
   <head>
     <meta charset="utf-8" />
     <script src="https://cdn.jsdelivr.net/npm/roslib/build/roslib.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
   </head>
 
   <body>
-    <h2>rosbridge test</h2> 
     <div id="log"></div>
     <div style="display:flex; align-items:flex-start;">
       <canvas id="map" width="894" height="624" style="border:1px solid black;"></canvas>
 
-      <!-- === RIGHT SIDE CONTROL PANEL === -->
-      <div style="margin-left:15px; width:260px; font-family:sans-serif;">
-        <h3 style="margin-bottom: 8px;">Bezier Parameters</h3>
+       <!-- === RIGHT SIDE TABBED PANEL === -->
+      <div style="margin-left:15px; width:800px; font-family:sans-serif;">
 
-        <label>
-          Bezier degree:
-          <input type="number" id="bezierDegree" value="8" min="1" style="width:60px;">
-        </label>
+        <div style="display:flex; margin-bottom:1px;">
+          <button class="tabBtn activeTab" onclick="openTab('missionTab', event)">Mission Control</button>
+          <button class="tabBtn" onclick="openTab('planningTab', event)">Planning Setup</button>
+        </div>
+        <!-- TAB 1: Mission Control -->
+        <div id="missionTab" class="tabContent activeContent">
 
-        <h4 style="margin-bottom: 4px; margin-top: 8px;">nSplit</h4>
-        <div id="nSplitInputs">
-          <input type="number" value="1" style="width:40px;">
-          <input type="number" value="1" style="width:40px;">
-          <input type="number" value="1" style="width:40px;">
+          <div style="display:flex; gap:40px; align-items:flex-start; margin-left: 30px;">
+            <div style="flex:1;">
+              <h4>Goal</h4>
+              <div class="inputRow">
+                <label>Heading [º]:</label>
+                <input id="goal_theta" type="number" class="big" step="5" value="0" style="margin-left: 16px;">
+              </div>
+
+              <div class="inputRow">
+                <label>Surge [m/s]:</label>
+                <input id="goal_v" type="number" class="big" step="0.01" value="0.01" style="margin-left: 14px;">
+              </div>
+
+              <button type="button" onclick="applyGoalParams()">Apply Goal Parameters</button>
+
+              <h4>Obstacle</h4>
+
+              <div class="inputRow">
+                <div class="inputPair">
+                  <label>Radius [m]:</label>
+                  <input type="number" class="big" id="obstacleRadius" value="2" min="0.1" step="0.1">
+                </div>
+                <div class="inputPair"> 
+                  <button class="smallBtn" onclick="addObstacleAtCenter()">Add</button>
+                  <button class="smallBtn" onclick="removeObstacle()">Remove</button> 
+                </div>
+              </div>
+
+              <button type="button" onclick="sendObstacles()">Send obstacle to node</button>
+
+              <h4>Active Vehicles</h4>
+              <div id="vehicleList" class="inputRow" style="margin-bottom: 8px;">
+                <!-- JS will populate checkboxes here -->
+              </div>
+
+              <h4>----------------------------------</h4>
+
+              <div><button type="button" onclick="runOptimization()">Run Optimization</button></div>
+              <div><button type="button" onclick="cancelOptimization()">Cancel Optimization</button></div>
+              <div><button type="button" onclick="deployMissionWithProgress()">Deploy Mission</button></div>
+            </div>
+            
+            <div style="flex:1; max-height:10px; max-width:200px; margin-right: 30px;">
+              <h4>Mission Stages</h4>
+              <div id="stageDiagram" style="display:flex; flex-direction:column; gap:12px;">
+
+                <div class="stage" id="stagePlanning">
+                  Planning<br>node active
+                </div>
+
+                <div class="stage" id="stageObstacle">
+                  Obstacles<br>Updated
+                </div>
+
+                <div class="stage" id="stageOptimization">
+                  Optimization
+                </div>
+
+                <div class="stage" id="stageExecuting">
+                  Executing
+                  <div id="executionProgressContainer" style="margin-top:4px; background:#ddd; width:100%; height:8px; border-radius:4px;">
+                    <div id="executionProgress" style="width:0%; height:100%; background:#2196F3; border-radius:4px;"></div>
+                  </div>
+                </div>
+
+              </div>
+              <h4 style="margin-top:20px;">Node Log</h4>
+
+              <div id="nodeLogContainer">
+                <div id="nodeLog"></div>
+              </div>
+            </div>
+          
+          </div> 
         </div>
 
-        <h4 style="margin-bottom: 4px; margin-top: 8px;">Constraints</h4>
-        <label><input type="checkbox" id="c0" checked> Velocity</label><br>
-        <label><input type="checkbox" id="c1"> Acceleration</label><br>
-        <label><input type="checkbox" id="c2"> Angular velocity</label><br>
-        <label><input type="checkbox" id="c3"> Angular acceleration</label><br>
+        <!-- TAB 2: Planning Setup -->
+        <div id="planningTab" class="tabContent">
+          <div style="display:flex; gap:40px; align-items:flex-start; margin-left: 30px;">
 
-        <h4 style="margin-bottom: 4px; margin-top: 8px;">Visualisation:</h4>
-        <label>
-          Sample points:
-          <input type="number" id="samplePts" value="100" min="20" style="width:60px;">
-        </label>
+            <div style="flex:1;">
+              <h4>Bounds</h4>
+              <h5>Surge [m/s]</h5>
+              <div class="inputRow"><label>min:  </label> <input id="vel_min" type="number" class="big" step="0.001" value="0.001" style="margin-left: 14px;"></div>
+              <div class="inputRow"><label>max: </label> <input id="vel_max" type="number" class="big" step="0.001" value="0.3" style="margin-left: 10px;"></div>
 
-        <br><br>
-        <button type="button" onclick="applyBezierParams()">Apply parameters</button>
+              <h5>Linear acceleration [m/s^2]</h5>
+              <div class="inputRow"><label>min:</label> <input id="acc_min" type="number" class="big" step="0.01" value="-0.03" style="margin-left: 14px;"></div>
+              <div class="inputRow"><label>max:</label> <input id="acc_max" type="number" class="big" step="0.01" value="0.03" style="margin-left: 10px;"></div>
+      
+              <h5>Yaw-rate [rad/s]</h5>
+              <div class="inputRow"><label>min:</label> <input id="ang_vel_min" type="number" class="big" step="0.01" value="-0.15" style="margin-left: 14px;"></div>
+              <div class="inputRow"><label>max:</label> <input id="ang_vel_max" type="number" class="big" step="0.01" value="0.15" style="margin-left: 10px;"></div>
 
-        <h3 style="margin-bottom: 8px;">Obstacle</h3>
-        <label>
-          Radius [m]: <input type="number" id="obstacleRadius" value="2" min="0.1" step="0.1" style="width:60px;">
-        </label>
-        <br><br>
-        <button type="button" onclick="addObstacleAtCenter()">Add Obstacle</button>
+              <h5>Angular acceleration[rad/s^2]</h5>
+              <div class="inputRow"><label>min:</label> <input id="ang_acc_min" type="number" class="big" step="0.001" value="-0.005" style="margin-left: 14px;"></div>
+              <div class="inputRow"><label>max:</label> <input id="ang_acc_max" type="number" class="big" step="0.001" value="0.005" style="margin-left: 10px;"></div>
 
-        <br><br>
-        <label> Remove ID: <input type="number" id="removeObstacleId" min="0" style="width:60px;"></label><br><br>
-        <button onclick="removeObstacle()">Remove Obstacle</button>
+              <h5>Obstacle distance [m]</h5>
+              <div class="inputRow"><label>min:</label> <input id="obs_min" type="number" class="big" step="0.1" value="2.0" style="margin-left: 14px;"></div>
+              <div class="inputRow"><label>max:</label> <input id="obs_max" type="number" class="big" step="0.1" value="10000.0" style="margin-left: 10px;"></div>
+              
+              <h5> Vehicle radius [m]</h5>
+              <input id="radius" type="number" class="big" step="0.1" value="1.5">
+            </div>
+            
+            <div style="flex:1;">
+            
+              <h4 style="margin-bottom: 4px;">Cost Function Gains</h4>
+              <div class="inputRow"><label>Time:</label> <input id="alpha" type="number" class="small" step="0.1" value="1.0" style="margin-left: 55px;"></div>
+              <div class="inputRow"><label>Energy:</label> <input id="beta" type="number" class="small" step="0.1" value="1.0"  style="margin-left: 40px;"></div>
+              <div class="inputRow"><label>End points:</label> <input id="gamma" type="number" class="small" step="0.1" value="1.0" style="margin-left: 10px;"></div>
 
-        <br><br>
-        <button type="button" onclick="sendObstacles()">Send obstacle to node</button>
+              <h4>Bezier Parameters</h4>
 
-        <h4>----------------------------------</h4>
-        <button type="button" onclick="runOptimization()">Run Optimization</button>
-        <button type="button" onclick="deployMission()">Deploy Mission</button>
-      </div>
+              <h5>
+                Bezier degree:
+                <input type="number" class="small" id="bezierDegree" value="9" min="1">
 
-      <div style="margin-left: 15px; width: 280px; font-family:sans-serif;">
-        <h3 style="margin-bottom: 6px;">Goal Parameters</h3>
+                &nbsp;&nbsp;&nbsp;&nbsp;
 
-        <label>Heading angle [degree]:</label><br>
-        <input id="goal_theta" type="number" step="5" value="0" style="width:80px;"><br>
+                Guess degree:
+                <input type="number" class="small" id="guessDegree" value="7" min="1">
+              </h5>
 
-        <label>Surge u [m/s]:</label><br>
-        <input id="goal_v" type="number" step="0.01" value="0.01" style="width:80px;"><br><br>
+              <h5>Split:</h5>
+              <div id="nSplitInputs">
+                <input type="number" class="small" value="1">
+                <input type="number" class="small" value="1">
+                <input type="number" class="small" value="1">
+              </div>
 
-        <button onclick="applyGoalParams()">Apply to Selected Vehicle</button>
+              <h5>Active constraints</h5>
+              <label  style="font-size: 12px;"><input type="checkbox" id="c0" checked> Velocity</label>
+              <label style="font-size: 12px;"><input type="checkbox" id="c1"> Acceleration</label>
+              <label style="font-size: 12px;"><input type="checkbox" id="c2"> Angular velocity</label>
+              <label style="font-size: 12px;"><input type="checkbox" id="c3"> Angular acceleration</label>
+              <button onclick="loadPlannerConfig()">Load From Solver</button>
+              <button onclick="applyChanges()">Apply Changes</button>
 
-        <h3 style="margin-bottom: 6px;">Bounds & Gains</h3>
-
-        <h5 style="margin-bottom: 4px; margin-top: 8px;">Surge [m/s]</h5>
-        <label>min:</label> <input id="vel_min" type="number" step="0.001" value="0.001" style="width:60px;">
-        <label>max:</label> <input id="vel_max" type="number" step="0.001" value="0.3" style="width:60px;"><br>
-
-        <h5 style="margin-bottom: 4px; margin-top: 8px;">Linear acceleration [m/s^2]</h5>
-        <label>min:</label> <input id="acc_min" type="number" step="0.01" value="-0.03" style="width:60px;">
-        <label>max:</label> <input id="acc_max" type="number" step="0.01" value="0.03" style="width:60px;"><br>
- 
-        <h5 style="margin-bottom: 4px; margin-top: 8px;">Yaw-rate [rad/s]</h5>
-        <label>min:</label> <input id="ang_vel_min" type="number" step="0.01" value="-0.15" style="width:60px;">
-        <label>max:</label> <input id="ang_vel_max" type="number" step="0.01" value="0.15" style="width:60px;"><br>
-
-        <h5 style="margin-bottom: 4px; margin-top: 8px;">Angular acceleration [rad/s^2]</h5>
-        <label>min:</label> <input id="ang_acc_min" type="number" step="0.001" value="-0.005" style="width:60px;">
-        <label>min:</label> <input id="ang_acc_max" type="number" step="0.001" value="0.005" style="width:60px;"><br>
-
-        <h5 style="margin-bottom: 4px; margin-top: 8px;">Obstacle distance [m]</h5>
-        <label>min:</label> <input id="obs_min" type="number" step="0.1" value="2.0" style="width:60px;">
-        <label>max:</label> <input id="obs_max" type="number" step="0.1" value="10000.0" style="width:60px;"><br>
-
-        <h5 style="margin-bottom: 4px; margin-top: 8px; margin-top: 8px;"> Vehicle radius [m]</h5>
-        <input id="radius" type="number" step="0.1" value="1.5" style="width:60px;"><br>
-
-        <h4 style="margin-bottom: 4px;">Cost Function Gains</h4>
-        <div>
-          <label>Time:</label> <input id="alpha" type="number" step="0.1" value="1.0" style="width:60px;"><br>
-          <label>Energy:</label> <input id="beta" type="number" step="0.1" value="1.0" style="width:60px;"><br>
-          <label>End points:</label> <input id="gamma" type="number" step="0.1" value="1.0" style="width:60px;">
-        </div><br>
-        
-        <button onclick="applyBounds()">Apply Bounds and Gains</button>
-
-        
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -116,6 +173,29 @@
       ros.on('connection', () => {document.getElementById('log').innerHTML +='<p>Connected to ROS</p>';});
       ros.on('error', (error) => {console.error(error);});
       
+      // === ROS TOPICS ===
+      ros.getTopics((topics) => {
+        console.log("ROS topics:", topics);
+      });
+      ros.getTopicsAndRawTypes((result) => {
+        const allTopics = result.topics;              // list of all topic names
+        const allTypes  = result.types;               // corresponding types
+        buildVehicleListFromTopics(allTopics);
+      });
+      // Keep track of the previous vehicle list
+      let knownVehicles = [];
+      // Start polling every 2 seconds
+      //const selectedVehicles = getSelectedVehicles(); // Use your UI-selected vehicles
+      setInterval(() => {
+        refreshVehicleList();  // your existing vehicle polling
+        const selectedVehicles = getSelectedVehicles(); // Use your UI-selected vehicles
+        if (selectedVehicles.length && !executionSubscribed) {
+          subscribeExecutionProgress(selectedVehicles);
+          executionSubscribed = true;
+        }
+      }, 2000);
+
+      let executionSubscribed = false;
       // === MAP SETUP ===
       const canvas = document.getElementById("map");
       const ctx = canvas.getContext("2d");
@@ -151,6 +231,12 @@
       const obstacles = {};
       let selectedObstacle = 0;
       const obstacleIds = [];
+      let nextObstacleId = 0;  // Tracks the next ID to assign
+      const obstacleImg = new Image();
+      obstacleImg.src = "rock.png";
+      
+
+
 
       // === TRAJECTORY & EXECUTION SETUP ===
       const trajectoryTopics = {};
@@ -176,61 +262,30 @@
         drawAllObjects();
       }, SAMPLE_DT_MS);
 
-
-      // Add red and black vehicles initialize 3 of each 
-      for (let i = 0; i < 3; i++) {
-        // (TODO: Initialize vehicle names dynamically)
-        vehicleNames.push(`mred${i}`);
-        vehicleNames.push(`mblack${i}`);
-      }
-
-      // Initialize vehicle States and subscribe to their topics and DrawVehicles
-      vehicleNames.forEach((name) => {
-        const topic = new ROSLIB.Topic({
-          ros: ros,
-          name: `/${name}/State`,
-          messageType: "farol_msgs/mState"
-        });
-
-        trajectoryTopics[name] = new ROSLIB.Topic({
-          ros: ros,
-          name: `/${name}/planned_path`,
-          messageType: "nav_msgs/Path"
-        });
-
-        trajectoryTopics[name].subscribe(msg => {
-          plannedTrajectories[name] = msg.poses.map(p => ({
-            E: p.pose.position.y,
-            N: p.pose.position.x
-          }));
-          drawAllObjects();
-        });
-
-        vehicles[name] = {
-          E: 0,
-          N: 0,
-          yaw: 0,
-          color: vehicleColor(name),
-          id: vehicleNumber(name)
-        };
-
-        topic.subscribe((msg) => {
-          const N = msg.Y;
-          const E = msg.X;
-
-          const yawRad = msg.Yaw * Math.PI / 180;
-          const yawCanvas = yawRad - Math.PI / 2;
-
-          vehicles[name].E = E;
-          vehicles[name].N = N;
-          vehicles[name].yaw = yawCanvas;
-          drawAllObjects();
-        });
+      var planningAliveTopic = new ROSLIB.Topic({
+        ros: ros,
+        name: '/motion_planning_cpp/node_alive',
+        messageType: 'std_msgs/Bool'
       });
 
+      let lastPlanningHeartbeat = Date.now();
+
+      planningAliveTopic.subscribe(function(message) {
+        lastPlanningHeartbeat = Date.now();
+        setStage("stagePlanning", "completed");
+      });
+      setInterval(function() {
+        const now = Date.now();
+
+        if (now - lastPlanningHeartbeat > 4000) {
+          resetStage("stagePlanning");
+        }
+      }, 500); // check every 0.5 sec
 
       // Draw background when loaded
       background.onload = () => {backgroundLoaded = true; drawBackground();};
+
+      loadMapState();
 
       // === SET SERVICES ===
       const setGoalService = new ROSLIB.Service({
@@ -251,6 +306,11 @@
       const runOptimizationService = new ROSLIB.Service({
         ros: ros,
         name: "/motion_planning_cpp/run_optimization",
+        serviceType: "motion_planning_cpp/RunOptimization"
+      });
+      const cancelOptimizationService = new ROSLIB.Service({
+        ros: ros,
+        name: "/motion_planning_cpp/cancel_optimization",
         serviceType: "std_srvs/Trigger"
       });
       const deployMissionService = new ROSLIB.Service({
@@ -315,6 +375,7 @@
           };
 
           sendGoalToVehicle(selectedVehicle, E, N);
+          saveMapState();
         }
 
         if (selectedObstacle) {
@@ -324,7 +385,9 @@
             obs.E = E;
             obs.N = N;
             console.log(`Moved obstacle ${selectedObstacle} to E=${E}, N=${N}`);
+            resetStage("stageObstacle");
             drawAllObjects(); // Redraw canvas
+            saveMapState();
           }
         }
       });
@@ -369,6 +432,277 @@
       canvas.addEventListener('mouseup', () => isDragging = false);
       canvas.addEventListener('mouseleave', () => isDragging = false);
 
+      let executionProgress = 0; // 0 = not started, 1 = completed
+      let gammaTopicSubscriber = null;
+
+      const logListener = new ROSLIB.Topic({
+        ros: ros,
+        name: '/mission_log',
+        messageType: 'std_msgs/String'
+      });
+
+      logListener.subscribe(function (message) {
+        addLog(message.data);
+      });
+
+
+      function startCPFForVehicle(vehicle, callback) {
+        const startService = new ROSLIB.Service({
+          ros: ros,
+          name: `/${vehicle}/CPFStart`,
+          serviceType: 'cpf_control/StartStop'
+        });
+
+        startService.callService(new ROSLIB.ServiceRequest(), (result) => {
+          console.log(`CPF started for ${vehicle}`, result);
+          if (callback) callback();
+        });
+      }
+
+      function stopCPFForVehicle(vehicle, callback) {
+        const stopService = new ROSLIB.Service({
+          ros: ros,
+          name: `/${vehicle}/CPFStop`,
+          serviceType: 'cpf_control/StartStop'
+        });
+
+        stopService.callService(new ROSLIB.ServiceRequest(), (result) => {
+          console.log(`CPF stopped for ${vehicle}`, result);
+          if (callback) callback();
+        });
+      }
+
+      function deployMissionWithProgress() {
+        const selectedVehicles = getSelectedVehicles(); // Use your UI-selected vehicles
+        if (!selectedVehicles || selectedVehicles.length === 0) return;
+
+        isExecutingMission = true;
+
+        
+        for (const vehicleId of selectedVehicles) {
+          executionSamples[vehicleId] = [];
+        }
+
+        const request = new ROSLIB.ServiceRequest();
+
+        let startedCount = 0;
+
+        selectedVehicles.forEach(vehicle => {
+          const startService = new ROSLIB.Service({
+            ros: ros,
+            name: `/${vehicle}/CPFStart`,
+            serviceType: 'cpf_control/StartStop'
+          });
+
+          startService.callService(new ROSLIB.ServiceRequest(), () => {
+            startedCount++;
+
+            if (startedCount === selectedVehicles.length) {
+
+              subscribeExecutionProgress(selectedVehicles);
+
+              deployMissionService.callService(request, (res) => {
+                console.log(res.message);
+                alert(res.message);
+
+                setStage("stageExecuting", "running");
+              });
+            }
+          });
+        });
+      }
+
+      function subscribeExecutionProgress(activeVehicles) {
+        if (!activeVehicles || activeVehicles.length === 0) return;
+
+        const firstVehicle = activeVehicles[0];
+        const topicName = `/${firstVehicle}/Gamma`;
+
+        const executionProgressTopic = new ROSLIB.Topic({
+          ros: ros,
+          name: topicName,
+          messageType: 'std_msgs/Float64'
+        });
+
+        let lastExecutionHeartbeat = Date.now();
+
+        executionProgressTopic.subscribe((msg) => {
+          lastExecutionHeartbeat = Date.now();
+
+          const progress = Math.min(Math.max(msg.data, 0), 1);
+
+          // Update progress bar
+          const progressEl = document.getElementById("executionProgress");
+          progressEl.style.width = `${progress * 100}%`;
+
+          // Running
+          if (progress > 0 && progress < 1) {
+            setStage("stageExecuting", "running");
+          }
+
+          // ✅ COMPLETED
+          else if (progress >= 1) {
+
+            setStage("stageExecuting", "completed");
+            isExecutingMission = false;
+
+            // Stop CPF for ALL vehicles
+            activeVehicles.forEach(vehicle => {
+              const stopService = new ROSLIB.Service({
+                ros: ros,
+                name: `/${vehicle}/CPFStop`,
+                serviceType: 'cpf_control/StartStop'
+              });
+
+              stopService.callService(new ROSLIB.ServiceRequest(), () => {
+                console.log(`CPF stopped for ${vehicle}`);
+              });
+            });
+
+            executionProgressTopic.unsubscribe();
+          }
+        });
+
+        // Auto-reset if no updates in 2 sec
+        setInterval(() => {
+          if (Date.now() - lastExecutionHeartbeat > 2000) {
+            resetStage("stageExecuting");
+            document.getElementById("executionProgress").style.width = "0%";
+          }
+        }, 500);
+      }
+
+      function refreshVehicleList() {
+        ros.getTopicsAndRawTypes((result) => {
+          const allTopics = result.topics;
+
+          // Extract vehicle names from /<vehicle>/State topics
+          const currentVehicles = allTopics
+            .map(t => {
+              const match = t.match(/^\/([^\/]+)\/State$/);
+              return match ? match[1] : null;
+            })
+            .filter(v => v !== null);
+
+          // Only update UI if something changed
+          const changed = currentVehicles.length !== knownVehicles.length ||
+                          !currentVehicles.every(v => knownVehicles.includes(v));
+
+          if (changed) {
+            knownVehicles = currentVehicles.slice();
+
+            currentVehicles.forEach(name => {
+              // Add to vehicleNames if not present
+              if (!vehicleNames.includes(name)) vehicleNames.push(name);
+
+              // Initialize vehicle object if not present
+              if (!vehicles[name]) {
+                vehicles[name] = {
+                  E: 0,
+                  N: 0,
+                  yaw: 0,
+                  color: vehicleColor(name),
+                  id: vehicleNumber(name)
+                };
+              }
+
+              // Subscribe to /<vehicle>/State if not already subscribed
+              if (!trajectoryTopics[name]) {
+                // Planned trajectory topic
+                trajectoryTopics[name] = new ROSLIB.Topic({
+                  ros: ros,
+                  name: `/${name}/planned_path`,
+                  messageType: "nav_msgs/Path"
+                });
+
+                trajectoryTopics[name].subscribe(msg => {
+                  plannedTrajectories[name] = msg.poses.map(p => ({
+                    E: p.pose.position.y,
+                    N: p.pose.position.x
+                  }));
+                  
+                  setStage("stageOptimization", "completed");
+
+                  drawAllObjects();
+                });
+
+                // State topic
+                const topic = new ROSLIB.Topic({
+                  ros: ros,
+                  name: `/${name}/State`,
+                  messageType: "farol_msgs/mState"
+                });
+
+                topic.subscribe((msg) => {
+                  vehicles[name].E = msg.X;
+                  vehicles[name].N = msg.Y;
+                  vehicles[name].yaw = (msg.Yaw * Math.PI / 180) - Math.PI / 2;
+                  drawAllObjects();
+                });
+              }
+            });
+
+            // Update UI
+            updateVehicleCheckboxList();
+          }
+        });
+      }
+
+      function buildVehicleListFromTopics(topics) {
+        vehicleNames.length = 0; // clear existing list
+
+        topics.forEach(t => {
+          // check if topic matches pattern "<name>/State"
+          const match = t.match(/^\/([^\/]+)\/State$/);
+          if (match) {
+            const name = match[1]; // e.g., "mred0"
+            if (!vehicleNames.includes(name)) {
+              vehicleNames.push(name);
+            }
+          }
+        });
+
+        // now update your checkbox list
+        updateVehicleCheckboxList();
+      }
+
+      function updateVehicleCheckboxList() {
+        const container = document.getElementById("vehicleList");
+        container.innerHTML = "";
+
+        vehicleNames.forEach(name => {
+          const div = document.createElement("div");
+          div.style.display = "flex";
+          div.style.alignItems = "center";
+          div.style.marginRight = "12px";
+
+          const label = document.createElement("label");
+          label.style.marginRight = "6px";
+          label.textContent = name;
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = true;
+          checkbox.id = `chk_${name}`;
+
+          div.appendChild(label);
+          div.appendChild(checkbox);
+          container.appendChild(div);
+        });
+      }
+
+      function getSelectedVehicles() {
+        const selected = [];
+
+        vehicleNames.forEach(name => {
+          const checkbox = document.getElementById(`chk_${name}`);
+          if (checkbox && checkbox.checked) {
+            selected.push(name);
+          }
+        });
+
+        return selected;
+      }
 
       function drawBackground() {
         if (!backgroundLoaded) return;
@@ -485,7 +819,6 @@
           drawVehicle(v.E, v.N, v.yaw, v.color, v.id, name === selectedVehicle);
         }
       }
-
 
       function drawVehicle(E, N, yaw, color, id, isSelected) {
         const p = worldToCanvas(E, N);
@@ -633,30 +966,45 @@
         const cx = (E - centerEasting) * scale + canvas.width / 2;
         const cy = canvas.height / 2 - (N - centerNorthing) * scale;
 
+        const pixelRadius = radius * scale;
+
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Circle
-        ctx.beginPath();
-        ctx.arc(0, 0, radius * scale, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
+        // Draw circular image scaled to radius
+        if (obstacleImg.complete) { // Make sure image is loaded
+          ctx.drawImage(
+            obstacleImg,
+            -pixelRadius, // top-left x
+            -pixelRadius, // top-left y
+            pixelRadius * 2, // width
+            pixelRadius * 2  // height
+          );
+        } else {
+          // Fallback: draw plain circle if image not loaded yet
+          ctx.beginPath();
+          ctx.arc(0, 0, pixelRadius, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
 
         // Outline if selected
         if (isSelected) {
           ctx.lineWidth = 1.5 / scaleFactor;
           ctx.strokeStyle = "yellow";
+          ctx.beginPath();
+          ctx.arc(0, 0, pixelRadius, 0, 2 * Math.PI);
           ctx.stroke();
         }
 
         // Label
-        const baseFontSize = 10; // pixels at scaleFactor = 1
-        const fontSize = baseFontSize / scaleFactor;
-        ctx.fillStyle = "white";
-        ctx.font = `bold ${fontSize}px Arial`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, 0, 0);
+        //const baseFontSize = 10; // pixels at scaleFactor = 1
+        //const fontSize = baseFontSize / scaleFactor;
+        //ctx.fillStyle = "white";
+        //ctx.font = `bold ${fontSize}px Arial`;
+        //ctx.textAlign = "center";
+        //ctx.textBaseline = "middle";
+        //ctx.fillText(label, 0, 0);
 
         ctx.restore();
       }
@@ -697,14 +1045,17 @@
       }
 
       function addObstacleAtCenter() {
-        const newId = `obs${obstacleIds.length}`;
         const radius = parseFloat(document.getElementById("obstacleRadius").value);
+
+        // Generate new unique ID
+        const newId = `obs${nextObstacleId}`;
+        nextObstacleId++; // Increment for the next obstacle
 
         obstacles[newId] = {
           E: centerEasting,
           N: centerNorthing,
           radius: radius,
-          color: "orange"
+          color: "gray"
         };
 
         obstacleIds.push(newId);
@@ -712,6 +1063,7 @@
 
         console.log(`Added obstacle ${newId} at center with radius ${radius} m`);
 
+        resetStage("stageObstacle");
         drawAllObjects(); // <-- draw everything including this obstacle
       }
 
@@ -726,42 +1078,36 @@
       }
 
       function removeObstacle() {
-        // Read the number entered
-        const idNum = parseInt(document.getElementById("removeObstacleId").value);
-
-        if (isNaN(idNum)) {
-          alert("Please enter a valid obstacle ID number.");
+        // Check if any obstacle is selected
+        if (!selectedObstacle) {
+          alert("No obstacle is currently selected.");
           return;
         }
 
-        // Construct internal obstacle ID string
-        const obsId = `obs${idNum}`;
+        const obsId = selectedObstacle;
 
-        // Check if the obstacle exists
-        if (!obstacles.hasOwnProperty(obsId)) {
-          alert(`Obstacle ${obsId} does not exist.`);
-          return;
+        // Remove from obstacles object
+        if (obstacles.hasOwnProperty(obsId)) {
+          delete obstacles[obsId];
         }
-
-        // Remove obstacle from both objects
-        delete obstacles[obsId];
 
         // Remove from obstacleIds array
         const index = obstacleIds.indexOf(obsId);
         if (index !== -1) obstacleIds.splice(index, 1);
 
-        // Clear selection if needed
-        if (selectedObstacle === obsId) selectedObstacle = null;
-
         console.log(`Obstacle ${obsId} removed.`);
 
+        // Clear selection
+        selectedObstacle = null;
+
         // Redraw everything
+        resetStage("stageObstacle");
         drawAllObjects();
       }
 
       function applyBezierParams() {
         const degree = parseInt(document.getElementById("bezierDegree").value);
-        const nPts = parseInt(document.getElementById("samplePts").value);
+        const guess_degree = parseInt(document.getElementById("guessDegree").value);
 
         const nSplitInputs = document
           .getElementById("nSplitInputs")
@@ -778,9 +1124,10 @@
 
         const request = new ROSLIB.ServiceRequest({
           bezier_degree: degree,
+          guess_degree: guess_degree,
           nSplit: nSplit,
           constr_flags: constr_flags,
-          number_sample_Pts: nPts
+          number_sample_Pts: 200
         });
 
         setParamsService.callService(request, (result) => {
@@ -810,11 +1157,55 @@
         }, (err) => {
           console.error("Error calling SetObstacles:", err);
         });
+        setStage("stageObstacle", "completed");
       }
 
       function runOptimization() {
+
+        setStage("stageOptimization", "running");
+
+        isExecutingMission = false;
+
+        for (const key in executionSamples) {
+          executionSamples[key] = [];
+        }
+        console.log("Optimization button pressed");
+
+        const selectedVehicles = getSelectedVehicles();
+        console.log("Selected vehicles:", selectedVehicles);
+        
+
+        // Optional safety check
+        if (selectedVehicles.length === 0) {
+          alert("Please select at least one vehicle.");
+          setStage("stageOptimization", "error");
+          return;
+        }
+
+        const request = new ROSLIB.ServiceRequest({
+          vehicle_names: selectedVehicles
+        });
+
+        runOptimizationService.callService(
+          request,
+          function(res) {
+            console.log("Service response received:", res);
+            alert(res.message);
+            setStage("stageOptimization", res.success ? "success" : "error");
+          },
+          function(err) {
+            console.error("Service call failed:", err);
+            alert("Service call failed. See console.");
+            setStage("stageOptimization", "error");
+          }
+        );
+      }
+
+      function cancelOptimization() {
          // Stop execution sampling if active
         isExecutingMission = false;
+
+        
 
         // Clear execution samples
         for (const key in executionSamples) {
@@ -822,24 +1213,15 @@
         }
         const request = new ROSLIB.ServiceRequest();
 
-        runOptimizationService.callService(request, (res) => {
-          console.log(res.message);
-          alert(res.message);
-        });
-      }
+        startService.callService(new ROSLIB.ServiceRequest(), () => {
 
-      function deployMission() {
-        isExecutingMission = true;
+          cancelOptimizationService.callService(request, (res) => {
+            console.log(res.message);
+            alert(res.message);
 
-        // Initialize buffers
-        for (const vehicleId of Object.keys(vehicles)) {
-          executionSamples[vehicleId] = [];
-        }
-        const request = new ROSLIB.ServiceRequest();
-
-        deployMissionService.callService(request, (res) => {
-          console.log(res.message);
-          alert(res.message);
+            setStage("stageOptimization", "idle");
+          });
+        
         });
       }
 
@@ -866,6 +1248,146 @@
           alert(res.message);
         });
       }
+
+      function applyChanges() {
+        applyBezierParams();
+        applyBounds();
+      }
+
+      function openTab(tabId, event) {
+        const contents = document.getElementsByClassName("tabContent");
+        const buttons = document.getElementsByClassName("tabBtn");
+
+        // Hide all tabs
+        for (let i = 0; i < contents.length; i++) {
+          contents[i].classList.remove("activeContent");
+        }
+
+        // Remove active class from all buttons
+        for (let i = 0; i < buttons.length; i++) {
+          buttons[i].classList.remove("activeTab");
+        }
+
+        // Show selected tab
+        document.getElementById(tabId).classList.add("activeContent");
+
+        // Mark the clicked button as active
+        event.currentTarget.classList.add("activeTab");
+      }
+
+      function resetStages() {
+        const stages = document.querySelectorAll(".stage");
+        stages.forEach(stage => {
+          stage.classList.remove("completed", "running");
+        });
+      }
+      
+      function resetStage(stageId) {
+        setStage(stageId, "pending");
+      }
+
+      function setStage(stageId, state) {
+        const stage = document.getElementById(stageId);
+        if (!stage) return;
+
+        // Remove previous state
+        stage.classList.remove("completed", "running");
+
+        // Apply new state
+        if (state === "completed") {
+          stage.classList.add("completed");
+        } 
+        else if (state === "running") {
+          stage.classList.add("running");
+        }
+      }
+
+      function saveMapState() {
+        localStorage.setItem("mp_obstacles", JSON.stringify(obstacles));
+        localStorage.setItem("mp_goals", JSON.stringify(goals));
+      }
+
+      function loadMapState() {
+
+        const savedObstacles = localStorage.getItem("mp_obstacles");
+        const savedGoals = localStorage.getItem("mp_goals");
+
+        if (savedObstacles) {
+          Object.assign(obstacles, JSON.parse(savedObstacles));
+        }
+
+        if (savedGoals) {
+          Object.assign(goals, JSON.parse(savedGoals));
+        }
+
+        drawAllObjects();
+      }
+
+      function addLog(message) {
+        const log = document.getElementById("nodeLog");
+
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+
+        log.appendChild(entry);
+
+        // Auto-scroll to bottom
+        log.parentElement.scrollTop = log.parentElement.scrollHeight;
+      }
+
+      function loadPlannerConfig() {
+
+        const service = new ROSLIB.Service({
+            ros: ros,
+            name: '/motion_planning_cpp/get_planner_config',
+            serviceType: 'motion_planning_cpp/GetPlannerConfig'
+        });
+
+        const request = new ROSLIB.ServiceRequest({});
+
+        service.callService(request, function(result) {
+
+            // Bounds
+            document.getElementById("vel_min").value = result.vel_min;
+            document.getElementById("vel_max").value = result.vel_max;
+            document.getElementById("acc_min").value = result.acc_min;
+            document.getElementById("acc_max").value = result.acc_max;
+
+            document.getElementById("ang_vel_min").value = result.ang_vel_min;
+            document.getElementById("ang_vel_max").value = result.ang_vel_max;
+
+            document.getElementById("ang_acc_min").value = result.ang_acc_min;
+            document.getElementById("ang_acc_max").value = result.ang_acc_max;
+
+            document.getElementById("obs_min").value = result.obs_min;
+            document.getElementById("obs_max").value = result.obs_max;
+
+            document.getElementById("radius").value = result.radius;
+
+            document.getElementById("alpha").value = result.alpha;
+            document.getElementById("beta").value  = result.beta;
+            document.getElementById("gamma").value = result.gamma;
+
+            // Bezier
+            document.getElementById("bezierDegree").value = result.bezier_degree;
+            document.getElementById("guessDegree").value  = result.guess_degree;
+
+            // nSplit
+            const splitInputs = document.querySelectorAll("#nSplitInputs input");
+            for (let i = 0; i < splitInputs.length; i++) {
+                splitInputs[i].value = result.nSplit[i] || 1;
+            }
+
+            // constraints
+            document.getElementById("c0").checked = result.constr_flags[0];
+            document.getElementById("c1").checked = result.constr_flags[1];
+            document.getElementById("c2").checked = result.constr_flags[2];
+            document.getElementById("c3").checked = result.constr_flags[3];
+
+            console.log("Planner config loaded from solver.");
+        });
+    }
 
     </script>
   </body>
